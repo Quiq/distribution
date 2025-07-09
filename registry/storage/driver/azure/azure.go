@@ -149,32 +149,9 @@ func (d *driver) PutContent(ctx context.Context, path string, contents []byte) e
 		}
 	}
 
-	// Always create as AppendBlob
-	appendBlobRef := d.client.NewAppendBlobClient(blobName)
-	if _, err := appendBlobRef.Create(ctx, nil); err != nil {
-		return fmt.Errorf("failed to create append blob: %v", err)
-	}
-
-	// If we have content, append it
-	if len(contents) > 0 {
-		// Write in chunks of maxChunkSize otherwise Azure can barf
-		// when writing large piece of data in one sot:
-		// RESPONSE 413: 413 The uploaded entity blob is too large.
-		for offset := 0; offset < len(contents); offset += maxChunkSize {
-			end := offset + maxChunkSize
-			if end > len(contents) {
-				end = len(contents)
-			}
-
-			chunk := contents[offset:end]
-			_, err := appendBlobRef.AppendBlock(ctx, streaming.NopCloser(bytes.NewReader(chunk)), nil)
-			if err != nil {
-				return fmt.Errorf("failed to append content: %v", err)
-			}
-		}
-	}
-
-	return nil
+	// TODO(milosgajdos): should we set some concurrency options on UploadBuffer
+	_, err = d.client.NewBlockBlobClient(blobName).UploadBuffer(ctx, contents, nil)
+	return err
 }
 
 // Reader retrieves an io.ReadCloser for the content stored at "path" with a
